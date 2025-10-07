@@ -132,13 +132,13 @@ excel_mcp/
 ### 运行功能测试
 
 ```bash
-go run test_mcp/test_excel.go
+go run ./test_mcp/test_excel
 ```
 
 ### 运行 MCP 客户端测试
 
 ```bash
-go run test_mcp/test_mcp_client.go
+go run ./test_mcp/test_mcp_client
 ```
 
 ## 依赖项

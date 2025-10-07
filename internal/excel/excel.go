@@ -1,11 +1,11 @@
 package excel
 
 import (
-	"encoding/csv"
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
+    "encoding/csv"
+    "fmt"
+    "os"
+    "path/filepath"
+    "strings"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -32,9 +32,9 @@ func ReadExcel(filePath string, sheetName string) ([]map[string]interface{}, err
 // data: 数据，格式为 []map[string]interface{}，其中 key 为列标题
 // sheetName: sheet 名称，对于 xlsx 文件，如果为空则使用 "Sheet1"；对于 csv 文件，此参数无效
 func WriteExcel(filePath string, data []map[string]interface{}, sheetName string) error {
-	if len(data) == 0 {
-		return fmt.Errorf("no data to write")
-	}
+    if len(data) == 0 {
+        return fmt.Errorf("no data to write")
+    }
 
 	ext := strings.ToLower(filepath.Ext(filePath))
 
@@ -162,9 +162,9 @@ func readCSV(filePath string) ([]map[string]interface{}, error) {
 
 // writeXLSX 写入 xlsx 文件
 func writeXLSX(filePath string, data []map[string]interface{}, sheetName string) error {
-	if sheetName == "" {
-		sheetName = "Sheet1"
-	}
+    if sheetName == "" {
+        sheetName = "Sheet1"
+    }
 
 	// 创建新文件
 	f := excelize.NewFile()
@@ -174,23 +174,17 @@ func writeXLSX(filePath string, data []map[string]interface{}, sheetName string)
 		}
 	}()
 
-	// 创建或重命名 sheet
-	defaultSheet := f.GetSheetName(0)
-	if defaultSheet != "" && defaultSheet != sheetName {
-		f.SetSheetName(defaultSheet, sheetName)
-	}
+    // 创建或重命名 sheet
+    defaultSheet := f.GetSheetName(0)
+    if defaultSheet != "" && defaultSheet != sheetName {
+        f.SetSheetName(defaultSheet, sheetName)
+    }
 
-	// 获取所有列名（从第一行数据中提取）
-	var headers []string
-	headerMap := make(map[string]bool)
-	for _, row := range data {
-		for key := range row {
-			if !headerMap[key] {
-				headers = append(headers, key)
-				headerMap[key] = true
-			}
-		}
-	}
+    // 预创建常用样式，避免每个单元格重复创建
+    intStyle, _ := f.NewStyle(&excelize.Style{NumFmt: 1}) // 整数格式 "0"
+
+    // 获取所有列名（使用稳定顺序）
+    headers := determineHeaders(data)
 
 	// 写入标题行
 	for i, header := range headers {
@@ -203,11 +197,11 @@ func writeXLSX(filePath string, data []map[string]interface{}, sheetName string)
 		}
 	}
 
-	// 写入数据行
-	for rowIdx, rowData := range data {
-		for colIdx, header := range headers {
-			cell, err := excelize.CoordinatesToCellName(colIdx+1, rowIdx+2)
-			if err != nil {
+    // 写入数据行
+    for rowIdx, rowData := range data {
+        for colIdx, header := range headers {
+            cell, err := excelize.CoordinatesToCellName(colIdx+1, rowIdx+2)
+            if err != nil {
 				return fmt.Errorf("failed to get cell name: %w", err)
 			}
 
@@ -221,72 +215,48 @@ func writeXLSX(filePath string, data []map[string]interface{}, sheetName string)
 				return fmt.Errorf("failed to set cell value: %w", err)
 			}
 
-			// 为数字类型设置格式，防止科学计数法
-			switch v := value.(type) {
-			case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-				// 整数：设置为数字格式，不使用科学计数法
-				style, err := f.NewStyle(&excelize.Style{
-					NumFmt: 1, // 0.00 格式，但对于整数会显示为整数
-				})
-				if err == nil {
-					f.SetCellStyle(sheetName, cell, cell, style)
-				}
-			case float32:
-				// 浮点数：检查是否是整数值
-				if v == float32(int64(v)) {
-					// 如果是整数值，设置为整数格式
-					style, err := f.NewStyle(&excelize.Style{
-						NumFmt: 1,
-					})
-					if err == nil {
-						f.SetCellStyle(sheetName, cell, cell, style)
-					}
-				}
-			case float64:
-				// 浮点数：检查是否是整数值
-				if v == float64(int64(v)) {
-					// 如果是整数值，设置为整数格式
-					style, err := f.NewStyle(&excelize.Style{
-						NumFmt: 1,
-					})
-					if err == nil {
-						f.SetCellStyle(sheetName, cell, cell, style)
-					}
-				}
-			}
-		}
-	}
+            // 为数字类型设置格式，防止科学计数法
+            switch v := value.(type) {
+            case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+                // 整数：设置为数字格式，不使用科学计数法
+                f.SetCellStyle(sheetName, cell, cell, intStyle)
+            case float32:
+                // 浮点数：检查是否是整数值
+                if v == float32(int64(v)) {
+                    // 如果是整数值，设置为整数格式
+                    f.SetCellStyle(sheetName, cell, cell, intStyle)
+                }
+            case float64:
+                // 浮点数：检查是否是整数值
+                if v == float64(int64(v)) {
+                    // 如果是整数值，设置为整数格式
+                    f.SetCellStyle(sheetName, cell, cell, intStyle)
+                }
+            }
+        }
+    }
 
 	// 保存文件
 	if err := f.SaveAs(filePath); err != nil {
 		return fmt.Errorf("failed to save file: %w", err)
 	}
 
-	return nil
+    return nil
 }
 
 // writeCSV 写入 csv 文件
 func writeCSV(filePath string, data []map[string]interface{}) error {
-	file, err := os.Create(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to create file: %w", err)
-	}
+    file, err := os.Create(filePath)
+    if err != nil {
+        return fmt.Errorf("failed to create file: %w", err)
+    }
 	defer file.Close()
 
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
+    writer := csv.NewWriter(file)
+    defer writer.Flush()
 
-	// 获取所有列名
-	var headers []string
-	headerMap := make(map[string]bool)
-	for _, row := range data {
-		for key := range row {
-			if !headerMap[key] {
-				headers = append(headers, key)
-				headerMap[key] = true
-			}
-		}
-	}
+    // 获取所有列名（使用稳定顺序）
+    headers := determineHeaders(data)
 
 	// 写入标题行
 	if err := writer.Write(headers); err != nil {
@@ -305,7 +275,10 @@ func writeCSV(filePath string, data []map[string]interface{}) error {
 		}
 	}
 
-	return nil
+    if err := writer.Error(); err != nil {
+        return fmt.Errorf("failed to flush CSV: %w", err)
+    }
+    return nil
 }
 
 // formatValue 格式化值，防止科学计数法
@@ -361,9 +334,9 @@ func formatValue(value interface{}) string {
 
 // parseValue 尝试解析值的类型
 func parseValue(s string) interface{} {
-	if s == "" {
-		return ""
-	}
+    if s == "" {
+        return ""
+    }
 
 	// 尝试解析为数字
 	var i int
@@ -376,6 +349,62 @@ func parseValue(s string) interface{} {
 		return f
 	}
 
-	// 返回字符串
-	return s
+    // 返回字符串
+    return s
+}
+
+// determineHeaders 返回稳定的表头顺序，避免 map 迭代的随机性。
+// 规则：
+// 1) 若包含示例模板字段 ["xx", "xx2", "xxx3" ]，则固定顺序为该三列（A/B/C）。
+// 2) 其余字段按字典序排序并追加在后，确保稳定输出。
+func determineHeaders(data []map[string]interface{}) []string {
+    // 收集所有键
+    keySet := make(map[string]struct{})
+    for _, row := range data {
+        for k := range row {
+            keySet[k] = struct{}{}
+        }
+    }
+
+    // 模板优先顺序
+    tmpl := []string{"xx", "xx2", "xxx3"}
+    headers := make([]string, 0, len(keySet))
+
+    // 先放入模板中存在的键
+    for _, k := range tmpl {
+        if _, ok := keySet[k]; ok {
+            headers = append(headers, k)
+            delete(keySet, k)
+        }
+    }
+
+    // 将剩余键取出并排序（字典序），保证稳定
+    if len(keySet) > 0 {
+        rest := make([]string, 0, len(keySet))
+        for k := range keySet {
+            rest = append(rest, k)
+        }
+        // 简单字典序
+        sortStrings(rest)
+        headers = append(headers, rest...)
+    }
+
+    return headers
+}
+
+// sortStrings 仅依赖标准库，避免额外引入，简单实现字符串切片的原地排序（字典序）。
+func sortStrings(a []string) {
+    if len(a) < 2 {
+        return
+    }
+    // 使用插入排序，数据量通常很小
+    for i := 1; i < len(a); i++ {
+        v := a[i]
+        j := i - 1
+        for j >= 0 && a[j] > v {
+            a[j+1] = a[j]
+            j--
+        }
+        a[j+1] = v
+    }
 }
