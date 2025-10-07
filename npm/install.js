@@ -9,7 +9,11 @@ const { execSync } = require('child_process');
 const platform = process.platform;
 const arch = process.arch;
 
-console.log('🚀 Excel MCP 安装中...');
+console.log('');
+console.log('╔════════════════════════════════════════════════╗');
+console.log('║       🚀 Excel MCP Server 安装程序       ║');
+console.log('╚════════════════════════════════════════════════╝');
+console.log('');
 console.log(`   平台: ${platform}`);
 console.log(`   架构: ${arch}`);
 
@@ -89,14 +93,34 @@ function downloadFileOnce(url, dest) {
 
       const totalSize = parseInt(response.headers['content-length'], 10);
       let downloadedSize = 0;
-      let lastPercent = 0;
+      let lastUpdate = Date.now();
+      const startTime = Date.now();
 
       response.on('data', (chunk) => {
         downloadedSize += chunk.length;
-        const percent = Math.floor((downloadedSize / totalSize) * 100);
-        if (percent > lastPercent && percent % 10 === 0) {
-          process.stdout.write(`\r   进度: ${percent}%`);
-          lastPercent = percent;
+        const now = Date.now();
+
+        // 每 100ms 更新一次进度条
+        if (now - lastUpdate > 100) {
+          const percent = Math.floor((downloadedSize / totalSize) * 100);
+          const downloaded = (downloadedSize / 1024 / 1024).toFixed(2);
+          const total = (totalSize / 1024 / 1024).toFixed(2);
+
+          // 计算速度
+          const elapsed = (now - startTime) / 1000;
+          const speed = downloadedSize / elapsed / 1024 / 1024; // MB/s
+
+          // 计算剩余时间
+          const remaining = (totalSize - downloadedSize) / (downloadedSize / elapsed);
+          const eta = remaining > 0 && remaining < 3600 ? `${Math.ceil(remaining)}s` : '--';
+
+          // 绘制进度条 [=====>    ]
+          const barLength = 20;
+          const filled = Math.floor(barLength * percent / 100);
+          const bar = '='.repeat(filled) + '>'.padEnd(barLength - filled);
+
+          process.stdout.write(`\r   [${bar}] ${percent}% | ${downloaded}/${total}MB | ${speed.toFixed(2)}MB/s | ETA: ${eta}`);
+          lastUpdate = now;
         }
       });
 
@@ -175,8 +199,10 @@ async function install() {
     const binaryName = getBinaryName();
     const version = getLatestVersion();
 
-    console.log(`   版本: v${version}`);
-    console.log(`   二进制: ${binaryName}\n`);
+    console.log('');
+    console.log(`   📦 版本: v${version}`);
+    console.log(`   📄 文件: ${binaryName}`);
+    console.log('');
 
     // 下载 URL
     const downloadUrl = `https://github.com/Xuzan9396/excel_mcp/releases/download/v${version}/${binaryName}`;
@@ -205,11 +231,17 @@ async function install() {
     const stats = fs.statSync(binaryPath);
     console.log(`   大小: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
 
-    console.log('\n✅ 安装成功！');
-    console.log('\n💡 使用方法:');
+    console.log('');
+    console.log('╔════════════════════════════════════════════════╗');
+    console.log('║           ✅ 安装成功！                  ║');
+    console.log('╚════════════════════════════════════════════════╝');
+    console.log('');
+    console.log('💡 使用方法:');
     console.log('   npx @xuzan/excel-mcp');
-    console.log('\n📖 更多信息:');
-    console.log('   https://github.com/Xuzan9396/excel_mcp\n');
+    console.log('');
+    console.log('📖 完整文档:');
+    console.log('   https://github.com/Xuzan9396/excel_mcp');
+    console.log('');
 
   } catch (error) {
     console.error('\n❌ 安装失败:', error.message);
