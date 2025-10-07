@@ -193,6 +193,46 @@ async function downloadFile(url, dest) {
   }
 }
 
+// 下载文件（带镜像切换）
+async function downloadFileWithMirrors(urls, dest) {
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i];
+    const mirrorName = i === 0 ? 'GitHub' : `镜像 ${i}`;
+
+    console.log(`\n🔄 使用 ${mirrorName} 源下载...`);
+
+    let attempt = 0;
+    const maxAttempts = 3; // 每个镜像最多尝试 3 次
+
+    while (attempt < maxAttempts) {
+      attempt++;
+
+      try {
+        console.log(`📥 下载: ${url}`);
+        await downloadFileOnce(url, dest);
+        console.log('\n✓ 下载完成');
+        return; // 成功，直接返回
+      } catch (err) {
+        console.log(`\n⚠️  ${mirrorName} 下载失败 (尝试 ${attempt}/${maxAttempts}): ${err.message}`);
+
+        if (attempt < maxAttempts) {
+          const retryDelay = 2000; // 2 秒后重试
+          console.log(`   ${retryDelay / 1000} 秒后重试...`);
+          await delay(retryDelay);
+          process.stdout.write('\r\x1b[K');
+        } else if (i < urls.length - 1) {
+          console.log(`   切换到下一个镜像源...`);
+          await delay(1000);
+        }
+      }
+    }
+  }
+
+  // 所有镜像都失败，开始无限重试第一个源
+  console.log('\n⚠️  所有镜像源都失败，使用 GitHub 源无限重试...\n');
+  await downloadFile(urls[0], dest);
+}
+
 // 主安装流程
 async function install() {
   try {
@@ -204,8 +244,12 @@ async function install() {
     console.log(`   📄 文件: ${binaryName}`);
     console.log('');
 
-    // 下载 URL
-    const downloadUrl = `https://github.com/Xuzan9396/excel_mcp/releases/download/v${version}/${binaryName}`;
+    // 下载 URL（多个镜像源，失败时自动切换）
+    const downloadUrls = [
+      `https://github.com/Xuzan9396/excel_mcp/releases/download/v${version}/${binaryName}`,
+      `https://mirror.ghproxy.com/https://github.com/Xuzan9396/excel_mcp/releases/download/v${version}/${binaryName}`,
+      `https://gh.api.99988866.xyz/https://github.com/Xuzan9396/excel_mcp/releases/download/v${version}/${binaryName}`
+    ];
 
     // 目标路径
     const binDir = path.join(__dirname, 'bin');
@@ -217,8 +261,8 @@ async function install() {
       fs.mkdirSync(binDir, { recursive: true });
     }
 
-    // 下载二进制文件
-    await downloadFile(downloadUrl, binaryPath);
+    // 下载二进制文件（带镜像切换）
+    await downloadFileWithMirrors(downloadUrls, binaryPath);
 
     // 设置执行权限（Unix 系统）
     if (platform !== 'win32') {
