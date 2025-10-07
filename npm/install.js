@@ -56,11 +56,14 @@ function getLatestVersion() {
   return packageJson.version;
 }
 
-// 下载文件
-function downloadFile(url, dest) {
-  return new Promise((resolve, reject) => {
-    console.log(`📥 下载: ${url}`);
+// 延迟函数
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
+// 下载文件（单次尝试）
+function downloadFileOnce(url, dest) {
+  return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest);
     let timeoutId;
 
@@ -72,7 +75,7 @@ function downloadFile(url, dest) {
       if (response.statusCode === 302 || response.statusCode === 301) {
         file.close();
         fs.unlink(dest, () => {});
-        return downloadFile(response.headers.location, dest)
+        return downloadFileOnce(response.headers.location, dest)
           .then(resolve)
           .catch(reject);
       }
@@ -80,7 +83,7 @@ function downloadFile(url, dest) {
       if (response.statusCode !== 200) {
         file.close();
         fs.unlink(dest, () => {});
-        reject(new Error(`下载失败，HTTP 状态码: ${response.statusCode}`));
+        reject(new Error(`HTTP ${response.statusCode}`));
         return;
       }
 
@@ -101,7 +104,7 @@ function downloadFile(url, dest) {
 
       file.on('finish', () => {
         file.close();
-        console.log('\n✓ 下载完成');
+        if (timeoutId) clearTimeout(timeoutId);
         resolve();
       });
 
@@ -112,13 +115,13 @@ function downloadFile(url, dest) {
       });
     });
 
-    // 设置总体超时（60秒）
+    // 设置单次下载超时（30秒）
     timeoutId = setTimeout(() => {
       request.destroy();
       file.close();
       fs.unlink(dest, () => {});
-      reject(new Error('下载超时（60秒），请检查网络或稍后重试'));
-    }, 60000);
+      reject(new Error('单次下载超时'));
+    }, 30000);
 
     request.on('error', (err) => {
       if (timeoutId) clearTimeout(timeoutId);
@@ -131,9 +134,39 @@ function downloadFile(url, dest) {
       request.destroy();
       file.close();
       fs.unlink(dest, () => {});
-      reject(new Error('下载请求超时'));
+      reject(new Error('连接超时'));
     });
   });
+}
+
+// 下载文件（带无限重试）
+async function downloadFile(url, dest) {
+  let attempt = 0;
+  const maxRetryDelay = 30000; // 最大重试间隔 30 秒
+
+  console.log(`📥 下载: ${url}`);
+
+  while (true) {
+    attempt++;
+
+    try {
+      await downloadFileOnce(url, dest);
+      console.log('\n✓ 下载完成');
+      return;
+    } catch (err) {
+      // 计算重试间隔：指数退避，最大 30 秒
+      // 第1次: 1s, 第2次: 2s, 第3次: 4s, 第4次: 8s, 第5次: 16s, 第6次+: 30s
+      const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), maxRetryDelay);
+
+      console.log(`\n⚠️  下载失败 (尝试 ${attempt}): ${err.message}`);
+      console.log(`   ${retryDelay / 1000} 秒后重试...`);
+
+      await delay(retryDelay);
+
+      // 清理进度输出
+      process.stdout.write('\r\x1b[K');
+    }
+  }
 }
 
 // 主安装流程
