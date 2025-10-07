@@ -216,8 +216,43 @@ func writeXLSX(filePath string, data []map[string]interface{}, sheetName string)
 				value = ""
 			}
 
+			// 设置单元格值和格式，防止大数字转科学计数法
 			if err := f.SetCellValue(sheetName, cell, value); err != nil {
 				return fmt.Errorf("failed to set cell value: %w", err)
+			}
+
+			// 为数字类型设置格式，防止科学计数法
+			switch v := value.(type) {
+			case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+				// 整数：设置为数字格式，不使用科学计数法
+				style, err := f.NewStyle(&excelize.Style{
+					NumFmt: 1, // 0.00 格式，但对于整数会显示为整数
+				})
+				if err == nil {
+					f.SetCellStyle(sheetName, cell, cell, style)
+				}
+			case float32:
+				// 浮点数：检查是否是整数值
+				if v == float32(int64(v)) {
+					// 如果是整数值，设置为整数格式
+					style, err := f.NewStyle(&excelize.Style{
+						NumFmt: 1,
+					})
+					if err == nil {
+						f.SetCellStyle(sheetName, cell, cell, style)
+					}
+				}
+			case float64:
+				// 浮点数：检查是否是整数值
+				if v == float64(int64(v)) {
+					// 如果是整数值，设置为整数格式
+					style, err := f.NewStyle(&excelize.Style{
+						NumFmt: 1,
+					})
+					if err == nil {
+						f.SetCellStyle(sheetName, cell, cell, style)
+					}
+				}
 			}
 		}
 	}
@@ -263,7 +298,7 @@ func writeCSV(filePath string, data []map[string]interface{}) error {
 		var row []string
 		for _, header := range headers {
 			value := rowData[header]
-			row = append(row, fmt.Sprintf("%v", value))
+			row = append(row, formatValue(value))
 		}
 		if err := writer.Write(row); err != nil {
 			return fmt.Errorf("failed to write row: %w", err)
@@ -271,6 +306,57 @@ func writeCSV(filePath string, data []map[string]interface{}) error {
 	}
 
 	return nil
+}
+
+// formatValue 格式化值，防止科学计数法
+func formatValue(value interface{}) string {
+	if value == nil {
+		return ""
+	}
+
+	switch v := value.(type) {
+	case int:
+		return fmt.Sprintf("%d", v)
+	case int8:
+		return fmt.Sprintf("%d", v)
+	case int16:
+		return fmt.Sprintf("%d", v)
+	case int32:
+		return fmt.Sprintf("%d", v)
+	case int64:
+		return fmt.Sprintf("%d", v)
+	case uint:
+		return fmt.Sprintf("%d", v)
+	case uint8:
+		return fmt.Sprintf("%d", v)
+	case uint16:
+		return fmt.Sprintf("%d", v)
+	case uint32:
+		return fmt.Sprintf("%d", v)
+	case uint64:
+		return fmt.Sprintf("%d", v)
+	case float32:
+		// 检查是否是整数值
+		if v == float32(int64(v)) {
+			return fmt.Sprintf("%.0f", v)
+		}
+		return fmt.Sprintf("%f", v)
+	case float64:
+		// 检查是否是整数值
+		if v == float64(int64(v)) {
+			return fmt.Sprintf("%.0f", v)
+		}
+		return fmt.Sprintf("%f", v)
+	case string:
+		return v
+	case bool:
+		if v {
+			return "true"
+		}
+		return "false"
+	default:
+		return fmt.Sprintf("%v", v)
+	}
 }
 
 // parseValue 尝试解析值的类型
