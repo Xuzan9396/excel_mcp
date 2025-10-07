@@ -16,7 +16,7 @@ go.work
 go.work.sum
 
 # Build output
-excel-mcp
+/excel-mcp
 *.xlsx
 *.csv
 *.xlsm
