@@ -62,16 +62,24 @@ function downloadFile(url, dest) {
     console.log(`📥 下载: ${url}`);
 
     const file = fs.createWriteStream(dest);
+    let timeoutId;
 
-    https.get(url, (response) => {
+    const request = https.get(url, { timeout: 30000 }, (response) => {
+      // 清除超时定时器
+      if (timeoutId) clearTimeout(timeoutId);
+
       // 处理重定向
       if (response.statusCode === 302 || response.statusCode === 301) {
+        file.close();
+        fs.unlink(dest, () => {});
         return downloadFile(response.headers.location, dest)
           .then(resolve)
           .catch(reject);
       }
 
       if (response.statusCode !== 200) {
+        file.close();
+        fs.unlink(dest, () => {});
         reject(new Error(`下载失败，HTTP 状态码: ${response.statusCode}`));
         return;
       }
@@ -96,9 +104,34 @@ function downloadFile(url, dest) {
         console.log('\n✓ 下载完成');
         resolve();
       });
-    }).on('error', (err) => {
+
+      file.on('error', (err) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        fs.unlink(dest, () => {});
+        reject(err);
+      });
+    });
+
+    // 设置总体超时（60秒）
+    timeoutId = setTimeout(() => {
+      request.destroy();
+      file.close();
+      fs.unlink(dest, () => {});
+      reject(new Error('下载超时（60秒），请检查网络或稍后重试'));
+    }, 60000);
+
+    request.on('error', (err) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      file.close();
       fs.unlink(dest, () => {});
       reject(err);
+    });
+
+    request.on('timeout', () => {
+      request.destroy();
+      file.close();
+      fs.unlink(dest, () => {});
+      reject(new Error('下载请求超时'));
     });
   });
 }

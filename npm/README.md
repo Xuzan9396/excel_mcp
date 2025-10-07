@@ -56,10 +56,17 @@ npx -y @xuzan/excel-mcp
 ## 完整文档
 
 查看 [GitHub 仓库](https://github.com/Xuzan9396/excel_mcp) 了解更多信息。
+git add internal/excel/excel.go && git commit -m "fix: 修复写入时大数字转科学计数法问题
 
-## 问题反馈
+      - CSV 写入：添加 formatValue 函数，正确格式化不同类型的数值
+      - Excel 写入：为数字单元格设置正确的数字格式，防止科学计数法
+      - 支持所有整数类型（int, int8-64, uint, uint8-64）
+      - 支持浮点数类型（float32, float64），整数值显示为整数
+      - 测试通过：3500364 和 900490861 正确显示，不再转换为 3.50E+06 和 9.00E+08"
 
-如有问题，请在 [GitHub Issues](https://github.com/Xuzan9396/excel_mcp/issues) 中反馈。
+git push
+
+git tag -a v0.0.2 -m "Release v0.0.2 - 修复大数字转科学计数法问题" && git push origin v0.0.2
 
 ## 许可证
 
