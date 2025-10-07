@@ -1,0 +1,337 @@
+name: Release Excel MCP
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # macOS arm64 编译任务（Apple Silicon）
+  build-macos-arm64:
+    name: Build macOS ARM64
+    runs-on: macos-latest  # macos-latest 是 arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+
+      - name: Build
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "Building for macOS arm64 - Version: $VERSION"
+
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o excel-mcp ./cmd/excel-mcp
+
+          # 重命名
+          mv excel-mcp excel-mcp-darwin-arm64
+
+          # 验证
+          file excel-mcp-darwin-arm64
+          ls -lh excel-mcp-darwin-arm64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-mcp-darwin-arm64
+          path: excel-mcp-darwin-arm64
+
+  # macOS amd64 编译任务（Intel）
+  build-macos-amd64:
+    name: Build macOS AMD64
+    runs-on: macos-13  # macos-13 是 x86_64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+
+      - name: Build
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "Building for macOS amd64 - Version: $VERSION"
+
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o excel-mcp ./cmd/excel-mcp
+
+          # 重命名
+          mv excel-mcp excel-mcp-darwin-amd64
+
+          # 验证
+          file excel-mcp-darwin-amd64
+          ls -lh excel-mcp-darwin-amd64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-mcp-darwin-amd64
+          path: excel-mcp-darwin-amd64
+
+  # Linux 编译任务（amd64）
+  build-linux-amd64:
+    name: Build Linux AMD64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+
+      - name: Build
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "Building for Linux amd64 - Version: $VERSION"
+
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o excel-mcp ./cmd/excel-mcp
+
+          # 重命名
+          mv excel-mcp excel-mcp-linux-amd64
+
+          # 验证
+          file excel-mcp-linux-amd64
+          ls -lh excel-mcp-linux-amd64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-mcp-linux-amd64
+          path: excel-mcp-linux-amd64
+
+  # Windows 编译任务（amd64）
+  build-windows-amd64:
+    name: Build Windows AMD64
+    runs-on: ubuntu-latest  # 交叉编译
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+
+      - name: Build
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "Building for Windows amd64 - Version: $VERSION"
+
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o excel-mcp.exe ./cmd/excel-mcp
+
+          # 重命名
+          mv excel-mcp.exe excel-mcp-windows-amd64.exe
+
+          # 验证
+          file excel-mcp-windows-amd64.exe
+          ls -lh excel-mcp-windows-amd64.exe
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-mcp-windows-amd64
+          path: excel-mcp-windows-amd64.exe
+
+  # Windows 编译任务（arm64）
+  build-windows-arm64:
+    name: Build Windows ARM64
+    runs-on: ubuntu-latest  # 交叉编译
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+
+      - name: Build
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "Building for Windows arm64 - Version: $VERSION"
+
+          GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o excel-mcp.exe ./cmd/excel-mcp
+
+          # 重命名
+          mv excel-mcp.exe excel-mcp-windows-arm64.exe
+
+          # 验证
+          file excel-mcp-windows-arm64.exe
+          ls -lh excel-mcp-windows-arm64.exe
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-mcp-windows-arm64
+          path: excel-mcp-windows-arm64.exe
+
+  # 创建 GitHub Release 并发布到 NPM
+  create-release:
+    name: Create Release and Publish NPM
+    needs: [build-macos-arm64, build-macos-amd64, build-linux-amd64, build-windows-amd64, build-windows-arm64]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Display structure
+        run: ls -R ./artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          cp artifacts/excel-mcp-darwin-arm64/excel-mcp-darwin-arm64 release/
+          cp artifacts/excel-mcp-darwin-amd64/excel-mcp-darwin-amd64 release/
+          cp artifacts/excel-mcp-linux-amd64/excel-mcp-linux-amd64 release/
+          cp artifacts/excel-mcp-windows-amd64/excel-mcp-windows-amd64.exe release/
+          cp artifacts/excel-mcp-windows-arm64/excel-mcp-windows-arm64.exe release/
+
+          # 设置执行权限
+          chmod +x release/excel-mcp-darwin-*
+          chmod +x release/excel-mcp-linux-*
+
+          ls -lh release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/*
+          body: |
+            ## Excel MCP Server - Excel 文件读写 MCP 服务器
+
+            ### 🚀 快速安装（推荐）
+
+            **使用 npx（无需 Go 环境）**:
+            ```bash
+            npx -y @xuzan/excel-mcp
+            ```
+
+            **配置到 Claude Desktop**:
+            ```json
+            {
+              "mcpServers": {
+                "excel-mcp": {
+                  "command": "npx",
+                  "args": ["-y", "@xuzan/excel-mcp"]
+                }
+              }
+            }
+            ```
+
+            ### 📦 支持的平台
+
+            本次发布包含以下平台的二进制文件：
+
+            **macOS**:
+            - ✅ Apple Silicon (ARM64): `excel-mcp-darwin-arm64`
+            - ✅ Intel (AMD64): `excel-mcp-darwin-amd64`
+
+            **Linux**:
+            - ✅ x64 (AMD64): `excel-mcp-linux-amd64`
+
+            **Windows**:
+            - ✅ x64 (AMD64): `excel-mcp-windows-amd64.exe`
+            - ✅ ARM64: `excel-mcp-windows-arm64.exe`
+
+            ### 🔧 手动下载安装
+
+            **macOS (Apple Silicon)**:
+            ```bash
+            curl -L https://github.com/Xuzan9396/excel_mcp/releases/latest/download/excel-mcp-darwin-arm64 -o excel-mcp
+            chmod +x excel-mcp
+            mv excel-mcp /usr/local/bin/
+            ```
+
+            **macOS (Intel)**:
+            ```bash
+            curl -L https://github.com/Xuzan9396/excel_mcp/releases/latest/download/excel-mcp-darwin-amd64 -o excel-mcp
+            chmod +x excel-mcp
+            mv excel-mcp /usr/local/bin/
+            ```
+
+            **Linux (amd64)**:
+            ```bash
+            curl -L https://github.com/Xuzan9396/excel_mcp/releases/latest/download/excel-mcp-linux-amd64 -o excel-mcp
+            chmod +x excel-mcp
+            sudo mv excel-mcp /usr/local/bin/
+            ```
+
+            **Windows (amd64)**:
+            下载 `excel-mcp-windows-amd64.exe` 并放置到 PATH 环境变量目录中
+
+            ### ✨ 功能特性
+
+            - ✅ **读取 Excel**: 支持 .xlsx, .xlsm, .xltx, .xltm 格式
+            - ✅ **读取 CSV**: 支持 CSV 文件读取
+            - ✅ **写入 Excel**: 支持将 JSON 数据写入 Excel/CSV
+            - ✅ **跨平台**: macOS / Linux / Windows 全平台支持
+            - ✅ **简单易用**: MCP 协议，与 Claude 无缝集成
+
+            ### 📖 使用说明
+
+            在 Claude Desktop 中直接对话：
+            ```
+            帮我读取 /path/to/file.xlsx 文件
+            ```
+
+            或者写入数据：
+            ```
+            帮我将这些数据写入到 output.xlsx 文件
+            ```
+
+            ### 📚 完整文档
+
+            查看 [README.md](https://github.com/Xuzan9396/excel_mcp/blob/main/README.md) 了解更多信息。
+
+            ### 🐛 问题反馈
+
+            如有问题，请在 [GitHub Issues](https://github.com/Xuzan9396/excel_mcp/issues) 中反馈。
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Prepare NPM package
+        run: |
+          # 复制 npm 目录
+          cp -r npm npm-package
+          cd npm-package
+
+          # 创建 bin 目录
+          mkdir -p bin
+
+          # 获取版本号（去掉 v 前缀）
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "NPM Version: $VERSION"
+
+          # 更新 package.json 版本
+          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
+
+          cat package.json
+
+      - name: Publish to NPM
+        run: |
+          cd npm-package
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,45 @@
+{
+  "name": "@xuzan/excel-mcp",
+  "version": "0.0.1",
+  "description": "Excel MCP Server - Excel/CSV 文件读写 MCP 服务器",
+  "main": "index.js",
+  "bin": {
+    "excel-mcp": "./bin/excel-mcp.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js",
+    "test": "node bin/excel-mcp.js --help"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "excel",
+    "csv",
+    "xlsx",
+    "spreadsheet",
+    "file-io",
+    "golang"
+  ],
+  "author": "Xuzan <xuzan9396@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Xuzan9396/excel_mcp.git"
+  },
+  "homepage": "https://github.com/Xuzan9396/excel_mcp#readme",
+  "bugs": {
+    "url": "https://github.com/Xuzan9396/excel_mcp/issues"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
+}
