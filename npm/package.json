@@ -1,6 +1,6 @@
 {
   "name": "@xuzan/excel-mcp",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Excel MCP Server - Excel/CSV 文件读写 MCP 服务器",
   "main": "index.js",
   "bin": {
