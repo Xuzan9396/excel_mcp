@@ -163,14 +163,15 @@ function downloadFileOnce(url, dest) {
   });
 }
 
-// 下载文件（带无限重试）
+// 下载文件（带有限重试，避免无限阻塞导致 npx 缓存不能清理）
 async function downloadFile(url, dest) {
   let attempt = 0;
   const maxRetryDelay = 30000; // 最大重试间隔 30 秒
+  const maxAttempts = 6; // 最多重试 6 次（约 1+2+4+8+16+30 ≈ 61 秒）
 
   console.log(`📥 下载: ${url}`);
 
-  while (true) {
+  while (attempt < maxAttempts) {
     attempt++;
 
     try {
@@ -179,10 +180,12 @@ async function downloadFile(url, dest) {
       return;
     } catch (err) {
       // 计算重试间隔：指数退避，最大 30 秒
-      // 第1次: 1s, 第2次: 2s, 第3次: 4s, 第4次: 8s, 第5次: 16s, 第6次+: 30s
       const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), maxRetryDelay);
 
-      console.log(`\n⚠️  下载失败 (尝试 ${attempt}): ${err.message}`);
+      console.log(`\n⚠️  下载失败 (尝试 ${attempt}/${maxAttempts}): ${err.message}`);
+      if (attempt >= maxAttempts) {
+        throw new Error(`多次重试仍失败（共 ${maxAttempts} 次），请稍后再试。`);
+      }
       console.log(`   ${retryDelay / 1000} 秒后重试...`);
 
       await delay(retryDelay);
@@ -190,6 +193,31 @@ async function downloadFile(url, dest) {
       // 清理进度输出
       process.stdout.write('\r\x1b[K');
     }
+  }
+}
+
+// 清理 npm 在更新时创建但未删除的备份目录（.excel-mcp-*）
+function cleanupBackupDirs() {
+  try {
+    // 当前目录: .../node_modules/@xuzan/excel-mcp
+    const vendorDir = path.dirname(__dirname); // .../node_modules/@xuzan
+    const entries = fs.readdirSync(vendorDir, { withFileTypes: true });
+    const backups = entries
+      .filter((e) => e.isDirectory() && e.name.startsWith('.excel-mcp-'))
+      .map((e) => path.join(vendorDir, e.name));
+
+    for (const dir of backups) {
+      try {
+        // 仅删除我们自己的备份目录名称前缀，避免误删
+        fs.rmSync(dir, { recursive: true, force: true });
+        console.log(`🧹 已清理备份目录: ${path.basename(dir)}`);
+      } catch (e) {
+        // 忽略单个清理失败
+        console.warn(`⚠️  清理失败: ${path.basename(dir)} - ${e.message}`);
+      }
+    }
+  } catch (e) {
+    // 忽略读取失败
   }
 }
 
@@ -242,6 +270,9 @@ async function install() {
     console.log('📖 完整文档:');
     console.log('   https://github.com/Xuzan9396/excel_mcp');
     console.log('');
+
+    // 清理可能遗留的备份目录，避免下次 npx 更新时报 ENOTEMPTY
+    cleanupBackupDirs();
 
   } catch (error) {
     console.error('\n❌ 安装失败:', error.message);
